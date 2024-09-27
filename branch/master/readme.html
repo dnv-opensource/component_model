@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Introduction &#8212; Component Model 0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="_static/classic.css?v=843f8ea2" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=fd3f3429" />
+    
+    <script src="_static/documentation_options.js?v=2709fde1"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Modules documentation" href="modules.html" />
+    <link rel="prev" title="Welcome to Component Model documentation!" href="index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="modules.html" title="Modules documentation"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to Component Model documentation!"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Component Model 0.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Introduction</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h1>
+<p>The package extends the <a class="reference external" href="https://github.com/NTNU-IHB/PythonFMU">PythonFMU package</a>.
+It includes the necessary modules to construct a component model according to the fmi, OSP and DNV-RP-0513 standards
+with focus on the following features:</p>
+<ul class="simple">
+<li><p>seamless translation of a Python model to an FMU package with minimal overhead (definition of FMU interface)</p></li>
+<li><p>support of vector variables (numpy)</p></li>
+<li><p>support of variable units and display units</p></li>
+<li><p>support of range checking of variables</p></li>
+</ul>
+<p>Features which facilitate <a class="reference external" href="https://standards.dnv.com/explorer/document/6A4F5922251B496B9216572C23730D33/2">Assurance of Simulation Models, DNV-RP-0513</a>
+shall have a special focus in this package.</p>
+<section id="getting-started">
+<h2>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading">¶</a></h2>
+<p>A new model can consist of any python code. To turn the python code into an FMU the following is necessary</p>
+<ol class="arabic simple">
+<li><p>The model code is wrapped into a Python class which inherits from <cite>Model</cite></p></li>
+<li><p>The exposed interface variables (model parameters, input- and output connectors) are defined as <cite>Variable</cite> objects</p></li>
+<li><p>The <cite>(model).do_step( time, dt)</cite> function of the model class is extended with model internal code,
+i.e. model evolves from <cite>time</cite> to <cite>time+dt</cite>.</p></li>
+<li><p>Calling the method <cite>Model.build()</cite> will then compile the FMU and package it into a suitable FMU file.</p></li>
+</ol>
+<p>See the files <cite>example_models/bouncing_ball.py</cite> and <cite>tests/test_make_bouncingBall.py</cite> supplied with this package
+as a simple example of this process. The first file defines the model class
+and the second file demonstrates the process of making the FMU and using it within fmpy and OSP.</p>
+<ol class="arabic simple">
+<li><p>Install the <cite>component_model</cite> package: <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">component_model</span></code></p></li>
+<li><p>Software dependencies: <cite>PythonFMU</cite>, <cite>numpy</cite>, <cite>pint</cite>, <cite>uuid</cite>, <cite>ElementTree</cite></p></li>
+<li><p>Latest releases: Version 0.1, based on PythonFMU 0.64</p></li>
+</ol>
+</section>
+<section id="usage-example">
+<h2>Usage example<a class="headerlink" href="#usage-example" title="Link to this heading">¶</a></h2>
+<p>This is another BouncingBall example, using 3D vectors and units.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">sqrt</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">component_model.model</span> <span class="kn">import</span> <span class="n">Model</span>
+<span class="kn">from</span> <span class="nn">component_model.variable</span> <span class="kn">import</span> <span class="n">Variable</span>
+
+
+<span class="k">class</span> <span class="nc">BouncingBall</span><span class="p">(</span><span class="n">Model</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Another BouncingBall model, made in Python and using Model and Variable to construct a FMU.</span>
+
+<span class="sd">    Special features:</span>
+
+<span class="sd">    * The ball has a 3-D vector as position and speed</span>
+<span class="sd">    * As output variable the model estimates the next bouncing point</span>
+<span class="sd">    * As input variables, the restitution coefficient `e` and the ground angle at the bouncing point can be changed.</span>
+<span class="sd">    * Internal units are SI (m,s,rad)</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pos (np.array)=(0,0,1): The 3-D position in of the ball at time [m]</span>
+<span class="sd">        speed (np.array)=(1,0,0): The 3-D speed of the ball at time [m/s]</span>
+<span class="sd">        g (float)=9.81: The gravitational acceleration [m/s^2]</span>
+<span class="sd">        e (float)=0.9: The coefficient of restitution (dimensionless): |speed after| / |speed before| collision</span>
+<span class="sd">        min_speed_z (float)=1e-6: The minimum speed in z-direction when bouncing stops [m/s]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;BouncingBall_3D&quot;</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Another BouncingBall model, made in Python and using Model and Variable to construct a FMU&quot;</span><span class="p">,</span>
+        <span class="n">pos</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
+        <span class="n">speed</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+        <span class="n">g</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">9.81</span><span class="p">,</span>
+        <span class="n">e</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.9</span><span class="p">,</span>
+        <span class="n">min_speed_z</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-6</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">description</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pos</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">speed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">speed</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="n">g</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">g</span> <span class="o">=</span> <span class="n">g</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">e</span> <span class="o">=</span> <span class="n">e</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_speed_z</span> <span class="o">=</span> <span class="n">min_speed_z</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stopped</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">t_bounce</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">p_bounce</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">next_bounce</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_interface_variables</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_interface_variables</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Define the FMU2 interface variables, using the variable interface.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_pos</span> <span class="o">=</span> <span class="n">Variable</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;pos&quot;</span><span class="p">,</span>
+            <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The 3D position of the ball [m] (height in inch as displayUnit example.&quot;</span><span class="p">,</span>
+            <span class="n">causality</span><span class="o">=</span><span class="s2">&quot;output&quot;</span><span class="p">,</span>
+            <span class="n">variability</span><span class="o">=</span><span class="s2">&quot;continuous&quot;</span><span class="p">,</span>
+            <span class="n">initial</span><span class="o">=</span><span class="s2">&quot;exact&quot;</span><span class="p">,</span>
+            <span class="n">start</span><span class="o">=</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pos</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="s2">&quot;m&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pos</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">+</span> <span class="s2">&quot;m&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pos</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">+</span> <span class="s2">&quot;inch&quot;</span><span class="p">),</span>
+            <span class="n">rng</span><span class="o">=</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;100 m&quot;</span><span class="p">),</span> <span class="kc">None</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;10 m&quot;</span><span class="p">)),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_speed</span> <span class="o">=</span> <span class="n">Variable</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;speed&quot;</span><span class="p">,</span>
+            <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The 3D speed of the ball, i.e. d pos / dt [m/s]&quot;</span><span class="p">,</span>
+            <span class="n">causality</span><span class="o">=</span><span class="s2">&quot;output&quot;</span><span class="p">,</span>
+            <span class="n">variability</span><span class="o">=</span><span class="s2">&quot;continuous&quot;</span><span class="p">,</span>
+            <span class="n">initial</span><span class="o">=</span><span class="s2">&quot;exact&quot;</span><span class="p">,</span>
+            <span class="n">start</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;m/s&quot;</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">speed</span><span class="p">),</span>
+            <span class="n">rng</span><span class="o">=</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;1 m/s&quot;</span><span class="p">),</span> <span class="kc">None</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;-100 m/s&quot;</span><span class="p">,</span> <span class="s2">&quot;100 m/s&quot;</span><span class="p">)),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_g</span> <span class="o">=</span> <span class="n">Variable</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;g&quot;</span><span class="p">,</span>
+            <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The gravitational acceleration (absolute value).&quot;</span><span class="p">,</span>
+            <span class="n">causality</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span>
+            <span class="n">variability</span><span class="o">=</span><span class="s2">&quot;fixed&quot;</span><span class="p">,</span>
+            <span class="n">start</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;m/s^2&quot;</span><span class="p">,</span>
+            <span class="n">rng</span><span class="o">=</span><span class="p">(),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_e</span> <span class="o">=</span> <span class="n">Variable</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;e&quot;</span><span class="p">,</span>
+            <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The coefficient of restitution, i.e. |speed after| / |speed before| bounce.&quot;</span><span class="p">,</span>
+            <span class="n">causality</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span>
+            <span class="n">variability</span><span class="o">=</span><span class="s2">&quot;fixed&quot;</span><span class="p">,</span>
+            <span class="n">start</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">e</span><span class="p">,</span>
+            <span class="n">rng</span><span class="o">=</span><span class="p">(),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_p_bounce</span> <span class="o">=</span> <span class="n">Variable</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="s2">&quot;p_bounce&quot;</span><span class="p">,</span>
+            <span class="n">description</span><span class="o">=</span><span class="s2">&quot;The expected position of the next bounce as 3D vector&quot;</span><span class="p">,</span>
+            <span class="n">causality</span><span class="o">=</span><span class="s2">&quot;output&quot;</span><span class="p">,</span>
+            <span class="n">variability</span><span class="o">=</span><span class="s2">&quot;continuous&quot;</span><span class="p">,</span>
+            <span class="n">start</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">p_bounce</span><span class="p">),</span>
+            <span class="n">rng</span><span class="o">=</span><span class="p">(),</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">do_step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">dt</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Perform a simulation step from `time` to `time + dt`.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">do_step</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">dt</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">t_bounce</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">p_bounce</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">next_bounce</span><span class="p">()</span>
+        <span class="k">while</span> <span class="n">dt</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">t_bounce</span><span class="p">:</span>  <span class="c1"># if the time is this long</span>
+            <span class="n">dt</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">t_bounce</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pos</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">p_bounce</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">speed</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">a</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">t_bounce</span>  <span class="c1"># speed before bouncing</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">speed</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">speed</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>  <span class="c1"># speed after bouncing if e==1.0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">speed</span> <span class="o">*=</span> <span class="bp">self</span><span class="o">.</span><span class="n">e</span>  <span class="c1"># speed reduction due to coefficient of restitution</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">speed</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_speed_z</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">stopped</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">a</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">speed</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">pos</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">t_bounce</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">p_bounce</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">next_bounce</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">speed</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">a</span> <span class="o">*</span> <span class="n">dt</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pos</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">speed</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">a</span> <span class="o">*</span> <span class="n">dt</span><span class="o">**</span><span class="mi">2</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">pos</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pos</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="c1"># print(f&quot;@{time}. pos {self.pos}, speed {self.speed}, bounce {self.t_bounce}&quot;)</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="k">def</span> <span class="nf">next_bounce</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate time until next bounce and position where the ground will be hit,</span>
+<span class="sd">        based on current time, pos and speed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">stopped</span><span class="p">:</span>  <span class="c1"># stopped bouncing</span>
+            <span class="k">return</span> <span class="p">(</span><span class="mf">1e300</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">((</span><span class="mf">1e300</span><span class="p">,</span> <span class="mf">1e300</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="nb">float</span><span class="p">))</span>
+            <span class="c1"># return ( float(&#39;inf&#39;), np.array( (float(&#39;inf&#39;), float(&#39;inf&#39;), 0), float))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">t_bounce</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">speed</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">sqrt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">speed</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">g</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">pos</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">g</span>
+            <span class="n">p_bounce</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pos</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">speed</span> <span class="o">*</span> <span class="n">t_bounce</span>  <span class="c1"># linear. not correct for z-direction!</span>
+            <span class="n">p_bounce</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">return</span> <span class="p">(</span><span class="n">t_bounce</span><span class="p">,</span> <span class="n">p_bounce</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">setup_experiment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set initial (non-interface) variables.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">setup_experiment</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stopped</span> <span class="o">=</span> <span class="kc">False</span>
+</pre></div>
+</div>
+<p>The following might be noted:</p>
+<ul class="simple">
+<li><p>The interface variables are defined in a separate local method <cite>_interface_variables</cite>,
+keeping it separate from the model code.</p></li>
+<li><p>The <cite>do_step()</cite> method contains the essential code, describing how the ball moves through the air.
+It calls the <cite>super().do_step()</cite> method, which is essential to link it to <cite>Model</cite>.
+The <cite>return True</cite> statement is also essential for the working of the emerging FMU.</p></li>
+<li><p>The <cite>next_bounce()</cite> method is a helper method.</p></li>
+<li><p>In addition to the extension of <cite>do_step()</cite>, here also the <cite>setup_experiment()</cite> method is extended.
+Local (non-interface) variables can thus be initialized in a convenient way.</p></li>
+</ul>
+<p>It should be self-evident that thorough testing of any model is necessary <strong>before</strong> translation to a FMU.
+The simulation orchestration engine (e.g. OSP) used to run FMUs obfuscates error messages,
+such that first stage assurance of a model should aways done using e.g. <cite>pytest</cite>.</p>
+<p>The minimal code to make the FMU file package is</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">component_model.model</span> <span class="kn">import</span> <span class="n">Model</span>
+<span class="kn">from</span> <span class="nn">fmpy.util</span> <span class="kn">import</span> <span class="n">fmu_info</span>
+
+<span class="n">asBuilt</span> <span class="o">=</span> <span class="n">Model</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="s2">&quot;../component_model/example_models/bouncing_ball.py&quot;</span><span class="p">)</span>
+<span class="n">info</span> <span class="o">=</span> <span class="n">fmu_info</span><span class="p">(</span><span class="n">asBuilt</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>  <span class="c1"># not necessary, but it lists essential properties of the FMU</span>
+</pre></div>
+</div>
+<p>The model can then be run using <a class="reference external" href="https://pypi.org/project/FMPy/">fmpy</a></p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">fmpy</span> <span class="kn">import</span> <span class="n">plot_result</span><span class="p">,</span> <span class="n">simulate_fmu</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">simulate_fmu</span><span class="p">(</span>
+    <span class="s2">&quot;BouncingBall.fmu&quot;</span><span class="p">,</span>
+    <span class="n">stop_time</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span>
+    <span class="n">step_size</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+    <span class="n">validate</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">solver</span><span class="o">=</span><span class="s2">&quot;Euler&quot;</span><span class="p">,</span>
+    <span class="n">debug_logging</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">logger</span><span class="o">=</span><span class="nb">print</span><span class="p">,</span>
+    <span class="n">start_values</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;pos[2]&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span> <span class="c1"># optional start value settings</span>
+<span class="p">)</span>
+<span class="n">plot_result</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Similarly, the model can be run using <a class="reference external" href="https://opensimulationplatform.com/">OSP</a>
+(or rather <a class="reference external" href="https://pypi.org/project/libcosimpy/">libcosimpy</a> - OSP wrapped into Python):</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">libcosimpy.CosimEnums</span> <span class="kn">import</span> <span class="n">CosimExecutionState</span>
+<span class="kn">from</span> <span class="nn">libcosimpy.CosimExecution</span> <span class="kn">import</span> <span class="n">CosimExecution</span>
+<span class="kn">from</span> <span class="nn">libcosimpy.CosimSlave</span> <span class="kn">import</span> <span class="n">CosimLocalSlave</span>
+
+<span class="n">sim</span> <span class="o">=</span> <span class="n">CosimExecution</span><span class="o">.</span><span class="n">from_step_size</span><span class="p">(</span><span class="n">step_size</span><span class="o">=</span><span class="mf">1e7</span><span class="p">)</span>  <span class="c1"># empty execution object with fixed time step in nanos</span>
+<span class="n">bb</span> <span class="o">=</span> <span class="n">CosimLocalSlave</span><span class="p">(</span><span class="n">fmu_path</span><span class="o">=</span><span class="s2">&quot;./BouncingBall.fmu&quot;</span><span class="p">,</span> <span class="n">instance_name</span><span class="o">=</span><span class="s2">&quot;bb&quot;</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;SLAVE&quot;</span><span class="p">,</span> <span class="n">bb</span><span class="p">,</span> <span class="n">sim</span><span class="o">.</span><span class="n">status</span><span class="p">())</span>
+
+<span class="n">ibb</span> <span class="o">=</span> <span class="n">sim</span><span class="o">.</span><span class="n">add_local_slave</span><span class="p">(</span><span class="n">bb</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">ibb</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;local slave number </span><span class="si">{</span><span class="n">ibb</span><span class="si">}</span><span class="s2">&quot;</span>
+
+<span class="n">reference_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">var_ref</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">decode</span><span class="p">():</span> <span class="n">var_ref</span><span class="o">.</span><span class="n">reference</span> <span class="k">for</span> <span class="n">var_ref</span> <span class="ow">in</span> <span class="n">sim</span><span class="o">.</span><span class="n">slave_variables</span><span class="p">(</span><span class="n">ibb</span><span class="p">)}</span>
+
+<span class="c1"># Set initial values</span>
+<span class="n">sim</span><span class="o">.</span><span class="n">real_initial_value</span><span class="p">(</span><span class="n">ibb</span><span class="p">,</span> <span class="n">reference_dict</span><span class="p">[</span><span class="s2">&quot;pos[2]&quot;</span><span class="p">],</span> <span class="mf">2.0</span><span class="p">)</span>
+
+<span class="n">sim_status</span> <span class="o">=</span> <span class="n">sim</span><span class="o">.</span><span class="n">status</span><span class="p">()</span>
+<span class="k">assert</span> <span class="n">sim_status</span><span class="o">.</span><span class="n">current_time</span> <span class="o">==</span> <span class="mi">0</span>
+<span class="k">assert</span> <span class="n">CosimExecutionState</span><span class="p">(</span><span class="n">sim_status</span><span class="o">.</span><span class="n">state</span><span class="p">)</span> <span class="o">==</span> <span class="n">CosimExecutionState</span><span class="o">.</span><span class="n">STOPPED</span>
+<span class="n">infos</span> <span class="o">=</span> <span class="n">sim</span><span class="o">.</span><span class="n">slave_infos</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;INFOS&quot;</span><span class="p">,</span> <span class="n">infos</span><span class="p">)</span>
+
+<span class="c1"># Simulate for 1 second</span>
+<span class="n">sim</span><span class="o">.</span><span class="n">simulate_until</span><span class="p">(</span><span class="n">target_time</span><span class="o">=</span><span class="mf">3e9</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This is admittedly more complex than the <cite>fmpy</cite> example,
+but it should be emphasised that fmpy is made for single component model simulation (testing),
+while OSP is made for multi-component systems.</p>
+</section>
+<section id="contribute">
+<h2>Contribute<a class="headerlink" href="#contribute" title="Link to this heading">¶</a></h2>
+<p>Anybody in the FMU and OSP community is welcome to contribute to this code, to make it better,
+and especially including other features from model assurance,
+as we firmly believe that trust in our models is needed
+if we want to base critical decisions on the support from these models.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Introduction</a><ul>
+<li><a class="reference internal" href="#getting-started">Getting Started</a></li>
+<li><a class="reference internal" href="#usage-example">Usage example</a></li>
+<li><a class="reference internal" href="#contribute">Contribute</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="index.html"
+                          title="previous chapter">Welcome to Component Model documentation!</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="modules.html"
+                          title="next chapter">Modules documentation</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/readme.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="modules.html" title="Modules documentation"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to Component Model documentation!"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Component Model 0.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Introduction</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, DNV.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.0.2.
+    </div>
+  </body>
+</html>
